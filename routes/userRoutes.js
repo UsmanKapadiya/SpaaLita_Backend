@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+
 const authenticateToken = require('../middleware/authenticateToken');
 const {
   addUser,
@@ -7,9 +8,16 @@ const {
   deleteUser,
   getUsers,
   getUser,
+  loginUser,
+  logoutUser,
 } = require('../controllers/userController');
 
-// Apply token authentication to all user routes
+
+// Public routes
+router.post('/login', loginUser);
+router.post('/logout', logoutUser);
+
+// Apply token authentication to all user routes below
 router.use(authenticateToken);
 
 // Add user

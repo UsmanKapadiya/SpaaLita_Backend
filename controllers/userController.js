@@ -39,6 +39,9 @@ const addUser = async (req, res) => {
       return res.status(409).json({ success: false, message: 'User name or email already exists' });
     }
 
+    // Hash password before saving
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({
       profilePicture,
       userName,
@@ -50,7 +53,7 @@ const addUser = async (req, res) => {
       city,
       address,
       postalCode,
-      password,
+      password: hashedPassword,
       role,
       status
     });
@@ -131,10 +134,48 @@ const getUser = async (req, res) => {
   }
 };
 
+
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+
+// User Login
+const loginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required' });
+    }
+    const user = await User.findOne({ email, status: 'active' });
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+    // Compare password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+    // Generate JWT
+    const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
+    res.status(200).json({ success: true, message: 'Login successful', token, user: { id: user._id, email: user.email, userName: user.userName, role: user.role } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error logging in', error: error.message });
+  }
+};
+
+// User Logout (client should just delete token, but for completeness)
+const logoutUser = async (req, res) => {
+  // For stateless JWT, logout is handled on client by deleting token.
+  // Optionally, you can implement token blacklisting here.
+  res.status(200).json({ success: true, message: 'Logout successful' });
+};
+
 module.exports = {
   addUser,
   updateUser,
   deleteUser,
   getUsers,
   getUser,
+  loginUser,
+  logoutUser,
 };
