@@ -21,7 +21,7 @@ const adminLogin = async (req, res) => {
     const admin = await Admin.findOne({ username });
 
     if (!admin) {
-      return res.status(401).json({
+      return res.status(400).json({
         success: false,
         message: 'Invalid credentials',
       });
@@ -29,7 +29,7 @@ const adminLogin = async (req, res) => {
 
     // Check if admin is active
     if (!admin.isActive) {
-      return res.status(401).json({
+      return res.status(403).json({
         success: false,
         message: 'Admin account is deactivated',
       });
@@ -37,7 +37,7 @@ const adminLogin = async (req, res) => {
 
     // Check password (in production, use bcrypt.compare for hashed passwords)
     if (admin.password !== password) {
-      return res.status(401).json({
+      return res.status(400).json({
         success: false,
         message: 'Invalid credentials',
       });
