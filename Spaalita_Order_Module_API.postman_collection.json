@@ -1,0 +1,102 @@
+{
+    "info": {
+        "_postman_id": "ORDER-MODULE-API-2026-02-13",
+        "name": "Spaalita_Order_Module_API",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "description": "Postman collection for Spaalita Order & Payment (Stripe) Module. All endpoints require Bearer token except Stripe webhook."
+    },
+    "item": [
+        {
+            "name": "Create Order (Stripe Payment)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+                    { "key": "Content-Type", "value": "application/json", "type": "text" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"PRODUCT_ID\",\n      \"qty\": 1\n    }\n  ],\n  \"totalAmount\": 100,\n  \"shippingAddress\": \"123 Main St, City\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/orders/",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "orders", ""]
+                }
+            }
+        },
+        {
+            "name": "Get All Orders",
+            "request": {
+                "method": "GET",
+                "header": [
+                    { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/api/orders",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "orders"]
+                }
+            }
+        },
+        {
+            "name": "Update Order Status",
+            "request": {
+                "method": "PUT",
+                "header": [
+                    { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+                    { "key": "Content-Type", "value": "application/json", "type": "text" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"status\": \"paid\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/orders/:id",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "orders", ":id"]
+                }
+            }
+        },
+        {
+            "name": "Stripe Webhook (Test)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Content-Type", "value": "application/json", "type": "text" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"id\": \"evt_test_webhook\",\n  \"object\": \"event\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/orders/webhook",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "orders", "webhook"]
+                }
+            }
+        },
+        {
+            "name": "Create Payment Intent (Stripe)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Content-Type", "value": "application/json", "type": "text" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"amount\": 100,\n  \"currency\": \"usd\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/payment/create-payment-intent",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "payment", "create-payment-intent"]
+                }
+            }
+        }
+    ],
+    "variable": [
+        { "key": "base_url", "value": "http://localhost:5000" },
+        { "key": "token", "value": "" }
+    ]
+}

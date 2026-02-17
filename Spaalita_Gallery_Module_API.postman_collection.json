@@ -1,0 +1,64 @@
+{
+  "info": {
+    "_postman_id": "h7h7h7h7-7777-8888-9999-000000000000",
+    "name": "Spaalita Gallery Module API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Upload Image(s)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "image", "type": "file", "src": "", "description": "Single image (optional)" },
+            { "key": "images", "type": "file", "src": "", "description": "Multiple images (optional)" }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:5000/api/gallery/upload",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "gallery", "upload"]
+        }
+      }
+    },
+    {
+      "name": "Get All Gallery Images",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "http://localhost:5000/api/gallery",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "gallery"]
+        }
+      }
+    },
+    {
+      "name": "Delete Gallery Image",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "http://localhost:5000/api/gallery/:id",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "gallery", ":id"]
+        }
+      }
+    }
+  ]
+}
