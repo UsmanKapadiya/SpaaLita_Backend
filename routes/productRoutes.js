@@ -11,7 +11,16 @@ const {
 } = require('../controllers/productController');
 
 // Apply token authentication to all product routes
-router.use(authenticateToken);
+// Apply token authentication to protected product routes only
+router.post('/', authenticateToken, addProduct);
+router.put('/:id', authenticateToken, updateProduct);
+router.delete('/:id', authenticateToken, deleteProduct);
+// Get all products (no token required)
+router.get('/', getProducts);
+// Get single product (no token required)
+router.get('/:id', getProduct);
+// Get related products (no token required)
+router.get('/:id/related', getRelatedProducts);
 
 // Add product
 router.post('/', addProduct);

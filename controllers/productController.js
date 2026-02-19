@@ -55,10 +55,35 @@ const deleteProduct = async (req, res) => {
 };
 
 // Get all products (active only)
+// Get all products (active only) with pagination and search, no token required
 const getProducts = async (req, res) => {
   try {
-    const products = await Product.find({ status: { $ne: 'inactive' } });
-    res.status(200).json({ success: true, data: products });
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const query = {
+      status: { $ne: 'inactive' }
+    };
+    if (search) {
+      query.$or = [
+        { productName: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } }
+      ];
+    }
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const products = await Product.find(query)
+      .skip(skip)
+      .limit(parseInt(limit));
+    const total = await Product.countDocuments(query);
+    res.status(200).json({
+      success: true,
+      data: products,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching products', error: error.message });
   }
