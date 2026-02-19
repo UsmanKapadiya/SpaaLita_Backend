@@ -11,7 +11,16 @@ const {
 } = require('../controllers/giftCardController');
 
 // Apply token authentication to all gift card routes
-router.use(authenticateToken);
+// Apply token authentication to protected gift card routes only
+router.post('/', authenticateToken, addGiftCard);
+router.put('/:id', authenticateToken, updateGiftCard);
+router.delete('/:id', authenticateToken, deleteGiftCard);
+// Get all gift cards (no token required)
+router.get('/', getGiftCards);
+// Get single gift card (no token required)
+router.get('/:id', getGiftCard);
+// Get related gift cards (no token required)
+router.get('/:id/related', getRelatedGiftCards);
 
 // Add gift card
 router.post('/', addGiftCard);

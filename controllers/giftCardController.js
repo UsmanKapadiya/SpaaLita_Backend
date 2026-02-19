@@ -48,7 +48,7 @@ const deleteGiftCard = async (req, res) => {
     if (!giftCard) {
       return res.status(404).json({ success: false, message: 'Gift card not found' });
     }
-    res.status(200).json({ success: true, message: 'Gift card soft deleted (status set to inactive)' });
+    res.status(200).json({ success: true, message: 'Gift Card deleted (status set to inactive)' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error deleting gift card', error: error.message });
   }
@@ -57,9 +57,33 @@ const deleteGiftCard = async (req, res) => {
 // Get all gift cards (active only)
 const getGiftCards = async (req, res) => {
   try {
-    const giftCards = await GiftCard.find({ status: { $ne: 'inactive' } });
-    res.status(200).json({ success: true, data: giftCards });
-  } catch (error) {
+      const { page = 1, limit = 10, search = '' } = req.query;
+      const query = {
+        status: { $ne: 'inactive' }
+      };
+      if (search) {
+        query.$or = [
+          { productName: { $regex: search, $options: 'i' } },
+          { sku: { $regex: search, $options: 'i' } },
+          { category: { $regex: search, $options: 'i' } }
+        ];
+      }
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const products = await GiftCard.find(query)
+        .skip(skip)
+        .limit(parseInt(limit));
+      const total = await GiftCard.countDocuments(query);
+      res.status(200).json({
+        success: true,
+        data: products,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          pages: Math.ceil(total / parseInt(limit))
+        }
+      });
+    } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching gift cards', error: error.message });
   }
 };
