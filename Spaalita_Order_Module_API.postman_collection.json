@@ -23,7 +23,35 @@
                     "host": ["{{base_url}}"],
                     "path": ["api", "orders", ""]
                 }
-            }
+            },
+            "response": [
+                {
+                    "name": "Sample Create Order Response",
+                    "originalRequest": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+                            { "key": "Content-Type", "value": "application/json", "type": "text" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"PRODUCT_ID\",\n      \"qty\": 1\n    }\n  ],\n  \"totalAmount\": 100,\n  \"shippingAddress\": \"123 Main St, City\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/orders/",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "orders", ""]
+                        }
+                    },
+                    "status": "Created",
+                    "code": 201,
+                    "_postman_previewlanguage": "json",
+                    "header": [
+                        { "key": "Content-Type", "value": "application/json" }
+                    ],
+                    "body": "{\n  \"success\": true,\n  \"message\": \"Order created\",\n  \"data\": {\n    \"_id\": \"ORDER_ID\",\n    \"user\": {\n      \"_id\": \"USER_ID\",\n      \"userName\": \"testuser1\",\n      \"email\": \"testuser1@example.com\"\n    },\n    \"items\": [\n      {\n        \"productId\": {\n          \"_id\": \"PRODUCT_ID\",\n          \"productName\": \"Sample Product\"\n        },\n        \"qty\": 1,\n        \"price\": 100,\n        \"productName\": \"Sample Product\"\n      }\n    ],\n    \"totalAmount\": 100,\n    \"status\": \"pending\",\n    \"paymentStatus\": \"pending\",\n    \"shippingAddress\": \"123 Main St, City\",\n    \"createdAt\": \"2026-02-17T12:00:00.000Z\"\n  },\n  \"clientSecret\": \"STRIPE_CLIENT_SECRET\"\n}"
+                }
+            ]
         },
         {
             "name": "Get All Orders",
@@ -33,11 +61,42 @@
                     { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
                 ],
                 "url": {
-                    "raw": "{{base_url}}/api/orders",
+                    "raw": "{{base_url}}/api/orders?page=1&limit=10",
                     "host": ["{{base_url}}"],
-                    "path": ["api", "orders"]
+                    "path": ["api", "orders"],
+                    "query": [
+                        { "key": "page", "value": "1" },
+                        { "key": "limit", "value": "10" }
+                    ]
                 }
-            }
+            },
+            "response": [
+                {
+                    "name": "Sample Paginated Order List Response",
+                    "originalRequest": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/orders?page=1&limit=10",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "orders"],
+                            "query": [
+                                { "key": "page", "value": "1" },
+                                { "key": "limit", "value": "10" }
+                            ]
+                        }
+                    },
+                    "status": "OK",
+                    "code": 200,
+                    "_postman_previewlanguage": "json",
+                    "header": [
+                        { "key": "Content-Type", "value": "application/json" }
+                    ],
+                    "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"_id\": \"ORDER_ID\",\n      \"user\": {\n        \"_id\": \"USER_ID\",\n        \"userName\": \"testuser1\",\n        \"email\": \"testuser1@example.com\"\n      },\n      \"items\": [\n        {\n          \"productId\": {\n            \"_id\": \"PRODUCT_ID\",\n            \"productName\": \"Sample Product\"\n          },\n          \"qty\": 1,\n          \"price\": 100,\n          \"productName\": \"Sample Product\"\n        }\n      ],\n      \"totalAmount\": 100,\n      \"status\": \"pending\",\n      \"paymentStatus\": \"pending\",\n      \"shippingAddress\": \"123 Main St, City\",\n      \"createdAt\": \"2026-02-17T12:00:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 10,\n    \"totalPages\": 1\n  }\n}"
+                }
+            ]
         },
         {
             "name": "Update Order Status",
@@ -91,6 +150,25 @@
                     "raw": "{{base_url}}/api/payment/create-payment-intent",
                     "host": ["{{base_url}}"],
                     "path": ["api", "payment", "create-payment-intent"]
+                }
+            }
+        },
+        {
+            "name": "Order List (Search & Paginate)",
+            "request": {
+                "method": "GET",
+                "header": [
+                    { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/api/orders?search=SEARCH_TERM&page=1&limit=10",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "orders"],
+                    "query": [
+                        { "key": "search", "value": "SEARCH_TERM" },
+                        { "key": "page", "value": "1" },
+                        { "key": "limit", "value": "10" }
+                    ]
                 }
             }
         }

@@ -104,7 +104,7 @@ const deleteUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    res.status(200).json({ success: true, message: 'User soft deleted (status set to inactive)' });
+    res.status(200).json({ success: true, message: 'User deleted SuccessFully' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error deleting user', error: error.message });
   }
@@ -113,8 +113,40 @@ const deleteUser = async (req, res) => {
 // Get all users
 const getUsers = async (req, res) => {
   try {
-    const users = await User.find({ status: { $ne: 'inactive' } });
-    res.status(200).json({ success: true, data: users });
+    let { page = 1, limit = 10, search = '' } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const skip = (page - 1) * limit;
+
+    // Build search query for name, email, role
+    let query = { status: { $ne: 'inactive' } };
+    if (search && search.trim() !== '') {
+      const regex = new RegExp(search, 'i');
+      query.$or = [
+        { userName: regex },
+        { firstName: regex },
+        { lastName: regex },
+        { email: regex },
+        { role: regex }
+      ];
+    }
+
+    const total = await User.countDocuments(query);
+    const users = await User.find(query)
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: users,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching users', error: error.message });
   }
