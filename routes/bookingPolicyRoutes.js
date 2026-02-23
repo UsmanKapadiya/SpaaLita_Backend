@@ -9,18 +9,14 @@ const {
   getBookingPolicy,
 } = require('../controllers/bookingPolicyController');
 
-// Apply token authentication to all booking policy routes
-router.use(authenticateToken);
+// Apply token authentication only to protected routes
+router.post('/', authenticateToken, addBookingPolicy);
+router.put('/:id', authenticateToken, updateBookingPolicy);
+router.delete('/:id', authenticateToken, deleteBookingPolicy);
 
-// Add booking policy
-router.post('/', addBookingPolicy);
-// Update booking policy
-router.put('/:id', updateBookingPolicy);
-// Delete booking policy
-router.delete('/:id', deleteBookingPolicy);
-// Get all booking policies
+// Get all booking policies (public)
 router.get('/', getBookingPolicies);
-// Get single booking policy
+// Get single booking policy (public)
 router.get('/:id', getBookingPolicy);
 
 module.exports = router;
