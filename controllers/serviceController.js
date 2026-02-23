@@ -47,8 +47,28 @@ const deleteService = async (req, res) => {
 // Get all services (active only)
 const getServices = async (req, res) => {
   try {
-    const services = await Service.find({ status: { $ne: 'inactive' } });
-    res.status(200).json({ success: true, data: services });
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const query = {
+      status: { $ne: 'inactive' },
+      ...(search && {
+        serviceName: { $regex: search, $options: 'i' }
+      })
+    };
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [services, total] = await Promise.all([
+      Service.find(query).skip(skip).limit(parseInt(limit)),
+      Service.countDocuments(query)
+    ]);
+    res.status(200).json({
+      success: true,
+      data: services,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit))
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching services', error: error.message });
   }

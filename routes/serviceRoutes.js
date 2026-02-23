@@ -9,16 +9,14 @@ const {
   getService,
 } = require('../controllers/serviceController');
 
-// Apply token authentication to all service routes
-router.use(authenticateToken);
 
 // Add service
-router.post('/', addService);
+router.post('/', authenticateToken, addService);
 // Update service
-router.put('/:id', updateService);
+router.put('/:id',authenticateToken, updateService);
 // Delete service
-router.delete('/:id', deleteService);
-// Get all services
+router.delete('/:id', authenticateToken,  deleteService);
+// Get all services (public)
 router.get('/', getServices);
 // Get single service
 router.get('/:id', getService);
