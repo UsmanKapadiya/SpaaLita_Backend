@@ -6,18 +6,20 @@ const {
   updateMonthlySpecial,
   deleteMonthlySpecial,
   getMonthlySpecial,
+  getMonthlySpecialByID,
 } = require('../controllers/monthlySpecialController');
 
 // Apply token authentication to all monthly special routes
-router.use(authenticateToken);
+// router.use(authenticateToken);
 
 // Add monthly special
-router.post('/', addMonthlySpecial);
+router.post('/', authenticateToken, addMonthlySpecial);
 // Update monthly special
-router.put('/:id', updateMonthlySpecial);
+router.put('/:id', authenticateToken, updateMonthlySpecial);
 // Delete monthly special
-router.delete('/:id', deleteMonthlySpecial);
+router.delete('/:id', authenticateToken, deleteMonthlySpecial);
 // Get monthly special (the only one)
 router.get('/', getMonthlySpecial);
+router.get('/:id', getMonthlySpecialByID);
 
 module.exports = router;

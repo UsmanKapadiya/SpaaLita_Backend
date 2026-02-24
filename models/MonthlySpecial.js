@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const monthlySpecialSchema = new mongoose.Schema(
   {
-    title: {
+    month: {
       type: String,
       required: [true, 'Please provide a title'],
       trim: true,
