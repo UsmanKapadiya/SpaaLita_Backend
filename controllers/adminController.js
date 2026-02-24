@@ -35,13 +35,15 @@ const adminLogin = async (req, res) => {
       });
     }
 
-    // Check password (in production, use bcrypt.compare for hashed passwords)
-    if (admin.password !== password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid credentials',
-      });
-    }
+      // Check password (use bcrypt.compare for hashed passwords)
+      const bcrypt = require('bcryptjs');
+      const isMatch = await bcrypt.compare(password, admin.password);
+      if (!isMatch) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid credentials',
+        });
+      }
 
     // Generate JWT token (expires in 1 hour)
     const token = jwt.sign(
