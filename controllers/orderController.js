@@ -1,3 +1,5 @@
+const mongoose = require('mongoose');
+
 // Delete order (admin)
 const deleteOrder = async (req, res) => {
   try {
@@ -74,42 +76,42 @@ const createOrder = async (req, res) => {
   }
 };
 
+
+
 // Get all orders (admin) or user orders with pagination
 const getOrders = async (req, res) => {
   try {
-    // Pagination params
     let { page = 1, limit = 10, search = '', status } = req.query;
+
     page = parseInt(page);
     limit = parseInt(limit);
     const skip = (page - 1) * limit;
 
-    let query = {};
-    if (req.user.role !== 'admin') {
-      query.user = req.user.id;
-    }
-    if (status && status !== '') {
-      query.status = status;
-    }
-
-    // If search is provided, build $or query for userName, email, status, or productName (from products array)
-    let userOrProductMatch = [];
-    if (search && search.trim() !== '') {
-      const regex = new RegExp(search, 'i');
-      userOrProductMatch.push(
-        { status: regex },
-        { 'user.userName': regex },
-        { 'user.email': regex },
-        { 'products.productName': regex }
-      );
-    }
-
-    // Aggregate pipeline for search and pagination
     const pipeline = [];
-    if (Object.keys(query).length > 0) {
-      pipeline.push({ $match: query });
+
+    // =============================
+    // USER / ADMIN FILTER
+    // =============================
+    const matchQuery = {};
+
+    if (req.user.role !== 'admin') {
+      matchQuery.user = new mongoose.Types.ObjectId(req.user.id);
     }
+
+    if (status && status !== '') {
+      matchQuery.status = status;
+    }
+
+    if (Object.keys(matchQuery).length > 0) {
+      pipeline.push({ $match: matchQuery });
+    }
+
+    // =============================
+    // LOOKUPS
+    // =============================
     pipeline.push(
-      { $lookup: {
+      {
+        $lookup: {
           from: 'users',
           localField: 'user',
           foreignField: '_id',
@@ -117,7 +119,8 @@ const getOrders = async (req, res) => {
         }
       },
       { $unwind: '$user' },
-      { $lookup: {
+      {
+        $lookup: {
           from: 'products',
           localField: 'items.productId',
           foreignField: '_id',
@@ -125,44 +128,67 @@ const getOrders = async (req, res) => {
         }
       }
     );
-    // If searching, match after lookups so productName is available
-    if (userOrProductMatch.length > 0) {
-      pipeline.push({ $match: { $or: userOrProductMatch } });
-    }
-    pipeline.push(
-      { $sort: { createdAt: -1 } },
-      { $skip: skip },
-      { $limit: limit }
-    );
 
-    // Get total count for pagination
-    const countPipeline = pipeline.slice(0, pipeline.findIndex(p => p.$skip !== undefined || p.$limit !== undefined));
-    countPipeline.push({ $count: 'total' });
+    // =============================
+    // SEARCH FILTER
+    // =============================
+    if (search && search.trim() !== '') {
+      const regex = new RegExp(search, 'i');
+
+      pipeline.push({
+        $match: {
+          $or: [
+            { status: regex },
+            { 'user.userName': regex },
+            { 'user.email': regex },
+            { 'products.productName': regex }
+          ]
+        }
+      });
+    }
+
+    // =============================
+    // SORT
+    // =============================
+    pipeline.push({ $sort: { createdAt: -1 } });
+
+    // =============================
+    // COUNT PIPELINE (before skip/limit)
+    // =============================
+    const countPipeline = [...pipeline, { $count: 'total' }];
     const totalResult = await Order.aggregate(countPipeline);
     const total = totalResult.length > 0 ? totalResult[0].total : 0;
 
-    // Get paginated orders
+    // =============================
+    // PAGINATION
+    // =============================
+    pipeline.push({ $skip: skip }, { $limit: limit });
+
     let orders = await Order.aggregate(pipeline);
 
-    // Attach productName to items
+    // =============================
+    // FORMAT ITEMS WITH PRODUCT NAME
+    // =============================
     orders = orders.map(order => {
       const formattedItems = order.items.map(item => {
-        let product = (order.products || []).find(p => p._id.toString() === (item.productId ? item.productId.toString() : ''));
-        let productName = product ? product.productName : item.name;
+        const product = (order.products || []).find(
+          p => p._id.toString() === item.productId?.toString()
+        );
+
         return {
           ...item,
-          productName
+          productName: product ? product.productName : item.name
         };
       });
+
       return {
         ...order,
-        user: order.user,
         items: formattedItems,
         shippingAddress: order.shippingAddress || ''
       };
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: orders,
       pagination: {
@@ -172,10 +198,116 @@ const getOrders = async (req, res) => {
         totalPages: Math.ceil(total / limit)
       }
     });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching orders', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching orders',
+      error: error.message
+    });
   }
 };
+// const getOrders = async (req, res) => {
+//   try {
+//     // Pagination params
+//     let { page = 1, limit = 10, search = '', status } = req.query;
+//     page = parseInt(page);
+//     limit = parseInt(limit);
+//     const skip = (page - 1) * limit;
+
+//     let query = {};
+//     if (req.user.role !== 'admin') {
+//       query.user = req.user.id;
+//     }
+//     if (status && status !== '') {
+//       query.status = status;
+//     }
+
+//     // If search is provided, build $or query for userName, email, status, or productName (from products array)
+//     let userOrProductMatch = [];
+//     if (search && search.trim() !== '') {
+//       const regex = new RegExp(search, 'i');
+//       userOrProductMatch.push(
+//         { status: regex },
+//         { 'user.userName': regex },
+//         { 'user.email': regex },
+//         { 'products.productName': regex }
+//       );
+//     }
+
+//     // Aggregate pipeline for search and pagination
+//     const pipeline = [];
+//     if (Object.keys(query).length > 0) {
+//       pipeline.push({ $match: query });
+//     }
+//     pipeline.push(
+//       { $lookup: {
+//           from: 'users',
+//           localField: 'user',
+//           foreignField: '_id',
+//           as: 'user'
+//         }
+//       },
+//       { $unwind: '$user' },
+//       { $lookup: {
+//           from: 'products',
+//           localField: 'items.productId',
+//           foreignField: '_id',
+//           as: 'products'
+//         }
+//       }
+//     );
+//     // If searching, match after lookups so productName is available
+//     if (userOrProductMatch.length > 0) {
+//       pipeline.push({ $match: { $or: userOrProductMatch } });
+//     }
+//     pipeline.push(
+//       { $sort: { createdAt: -1 } },
+//       { $skip: skip },
+//       { $limit: limit }
+//     );
+
+//     // Get total count for pagination
+//     const countPipeline = pipeline.slice(0, pipeline.findIndex(p => p.$skip !== undefined || p.$limit !== undefined));
+//     countPipeline.push({ $count: 'total' });
+//     const totalResult = await Order.aggregate(countPipeline);
+//     const total = totalResult.length > 0 ? totalResult[0].total : 0;
+
+//     // Get paginated orders
+//     let orders = await Order.aggregate(pipeline);
+
+//     // Attach productName to items
+//     orders = orders.map(order => {
+//       const formattedItems = order.items.map(item => {
+//         let product = (order.products || []).find(p => p._id.toString() === (item.productId ? item.productId.toString() : ''));
+//         let productName = product ? product.productName : item.name;
+//         return {
+//           ...item,
+//           productName
+//         };
+//       });
+//       return {
+//         ...order,
+//         user: order.user,
+//         items: formattedItems,
+//         shippingAddress: order.shippingAddress || ''
+//       };
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       data: orders,
+//       pagination: {
+//         total,
+//         page,
+//         limit,
+//         totalPages: Math.ceil(total / limit)
+//       }
+//     });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: 'Error fetching orders', error: error.message });
+//   }
+// };
 
 // Update order status (admin)
 const updateOrderStatus = async (req, res) => {
