@@ -18,6 +18,19 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+
+// Log all incoming requests
+app.use((req, res, next) => {
+  console.log(`Incoming request: ${req.method} ${req.url}`);
+  next();
+});
+
+// Global middleware to log all incoming requests
+app.use((req, res, next) => {
+  console.log(`Incoming Request: ${req.method} ${req.url}`);
+  next();
+});
+
 // Serve static files from uploads directory
 const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -36,16 +49,14 @@ const giftCardRoutes = require('./routes/giftCardRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
 const bookingPolicyRoutes = require('./routes/bookingPolicyRoutes');
 const monthlySpecialRoutes = require('./routes/monthlySpecialRoutes');
-const galleryRoutes = require('./routes/galleryRoutes');
+
 const roleRoutes = require('./routes/roleRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
-// const aboutRoutes = require('./routes/aboutRoutes');
-// const newsRoutes = require('./routes/newsRoutes');
-// const galleryRoutes = require('./routes/galleryRoutes');
-// const videoRoutes = require('./routes/videoRoutes');
-// const dashboardRoutes = require('./routes/dashboardRoutes');
 const contactRoutes = require('./routes/contactRoutes');
+const galleryRoutes = require('./routes/galleryRoutes');
+const couponRoutes = require('./routes/couponRoutes');
+
 
 // Use routes
 app.use('/api/admin', adminRoutes);
@@ -55,16 +66,12 @@ app.use('/api/giftcards', giftCardRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/booking-policies', bookingPolicyRoutes);
 app.use('/api/monthly-special', monthlySpecialRoutes);
-app.use('/api/gallery', galleryRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payment', paymentRoutes);
-// app.use('/api/about', aboutRoutes);
-// app.use('/api/news', newsRoutes);
-// app.use('/api/gallery', galleryRoutes);
-// app.use('/api/videos', videoRoutes);
-// app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/gallery', galleryRoutes);
+app.use('/api/coupon', couponRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
