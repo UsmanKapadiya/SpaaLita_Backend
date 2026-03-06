@@ -1,78 +1,259 @@
 const mongoose = require('mongoose');
 
-// Delete order (admin)
-const deleteOrder = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const order = await Order.findByIdAndDelete(id);
-    if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
-    }
-    res.status(200).json({ success: true, message: 'Order deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error deleting order', error: error.message });
-  }
-};
+
 const Order = require('../models/Order');
+const User = require('../models/User');
+const bcrypt = require("bcryptjs");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Create order and payment intent
+// const createOrder = async (req, res) => {
+//   try {
+//     const {
+//       items,
+//       totalAmount,
+//       shippingAddress,
+//       billingAddress,
+//       coupon,
+//       guestInfo
+//     } = req.body;
+
+//     const userId = req.user?.id || null;
+
+//     // If no user and no guest info
+//     if (!userId && !guestInfo) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Guest information required",
+//       });
+//     }
+
+//     // Validate user only if logged in
+//     if (userId) {
+//       const userDoc = await User.findById(userId);
+//       if (!userDoc) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "User not found",
+//         });
+//       }
+//     }
+
+//     if (!items || !Array.isArray(items) || items.length === 0 || !totalAmount) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Order items and total amount are required",
+//       });
+//     }
+
+//     let finalAmount = totalAmount;
+
+//     if (coupon && coupon.discountAmount) {
+//       finalAmount = Math.max(0, totalAmount - coupon.discountAmount);
+//     }
+
+//     const paymentIntent = await stripe.paymentIntents.create({
+//       amount: Math.round(finalAmount * 100),
+//       currency: "usd",
+//       metadata: {
+//         userId: userId || "guest",
+//         email: guestInfo?.email || "",
+//         couponCode: coupon?.code || "",
+//       },
+//     });
+
+//     const order = new Order({
+//       user: userId,
+//       guestInfo: userId ? null : guestInfo,
+//       items,
+//       totalAmount: finalAmount,
+//       status: "pending",
+//       paymentIntentId: paymentIntent.id,
+//       paymentStatus: "pending",
+//       shippingAddress,
+//       billingAddress,
+//       coupon: coupon || null,
+//     });
+
+//     await order.save();
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Order created",
+//       data: order,
+//       clientSecret: paymentIntent.client_secret,
+//     });
+
+//   } catch (error) {
+//     console.error("Create Order Error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Error creating order",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// Create Order API
 const createOrder = async (req, res) => {
   try {
-    console.log("stripe", stripe);
-    const { items, totalAmount, shippingAddress, billingAddress } = req.body;
-    const userId = req.user.id;
-    // Validate user exists
-    const User = require('../models/User');
-    const userDoc = await User.findById(userId);
-    if (!userDoc) {
-      return res.status(400).json({ success: false, message: 'User not found. Cannot create order.' });
-    }
-    if (!items || !Array.isArray(items) || items.length === 0 || !totalAmount) {
-      return res.status(400).json({ success: false, message: 'Order items and total amount are required' });
-    }
-    // Create Stripe payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(totalAmount * 100), // Stripe expects amount in cents
-      currency: 'usd',
-      metadata: { userId },
-    });
-    // Create order in DB
-    const order = new Order({
-      user: userId,
+
+    const {
       items,
       totalAmount,
-      status: 'pending',
-      paymentIntentId: paymentIntent.id,
-      paymentStatus: 'pending',
       shippingAddress,
       billingAddress,
-    });
-    await order.save();
-    // Populate user and product details for response
-    const populatedOrder = await Order.findById(order._id)
-      .populate('user', 'userName email')
-      .populate('items.productId', 'productName');
+      coupon,
+      guestInfo,
+      createAccount
+    } = req.body;
 
-    // Format items to include productName
+    let userId = req.user?.id || null;
+
+    // Validate order items
+    if (!items || !Array.isArray(items) || items.length === 0 || !totalAmount) {
+      return res.status(400).json({
+        success: false,
+        message: "Order items and total amount are required"
+      });
+    }
+
+    // Guest checkout validation
+    if (!userId && !guestInfo) {
+      return res.status(400).json({
+        success: false,
+        message: "Guest information required"
+      });
+    }
+
+    // ------------------------------------------------
+    // CREATE USER ACCOUNT IF REQUESTED
+    // ------------------------------------------------
+    if (!userId && createAccount && guestInfo?.email) {
+
+      let existingUser = await User.findOne({ email: guestInfo.email });
+
+      if (!existingUser) {
+
+        const randomPassword = Math.random().toString(36).slice(-8);
+        const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+        const userName = `${billingAddress.firstName}${billingAddress.lastName}`.replace(/\s/g, "").toLowerCase();
+
+        const newUser = new User({
+          userName, // required
+          firstName: billingAddress.firstName, // required
+          lastName: billingAddress.lastName,   // required
+          email: guestInfo.email,              // required
+          phone: billingAddress.phone,         // required
+          country: billingAddress.country,     // required
+          city: billingAddress.city,           // required
+          address: billingAddress.address1,    // required
+          postalCode: billingAddress.postcode, // required
+          password: hashedPassword,
+
+          // optional nested info
+          billing: billingAddress,
+          shipping: shippingAddress
+        });
+
+        await newUser.save();
+
+        userId = newUser._id;
+
+        console.log("Guest converted to registered user:", guestInfo.email);
+
+      } else {
+        userId = existingUser._id;
+      }
+    }
+
+    // ------------------------------------------------
+    // COUPON DISCOUNT
+    // ------------------------------------------------
+    let finalAmount = totalAmount;
+
+    if (coupon && coupon.discountAmount) {
+      finalAmount = Math.max(0, totalAmount - coupon.discountAmount);
+    }
+
+    // ------------------------------------------------
+    // CREATE STRIPE PAYMENT INTENT
+    // ------------------------------------------------
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(finalAmount * 100),
+      currency: "usd",
+      metadata: {
+        userId: userId ? userId.toString() : "guest",
+        email: guestInfo?.email || "",
+        couponCode: coupon?.code || ""
+      }
+    });
+
+    // ------------------------------------------------
+    // CREATE ORDER
+    // ------------------------------------------------
+    const order = new Order({
+      user: userId,
+      guestInfo: userId ? null : guestInfo,
+      items,
+      totalAmount: finalAmount,
+      status: "pending",
+      paymentIntentId: paymentIntent.id,
+      paymentStatus: "pending",
+      shippingAddress,
+      billingAddress,
+      coupon: coupon || null
+    });
+
+    await order.save();
+
+    // ------------------------------------------------
+    // POPULATE DATA
+    // ------------------------------------------------
+    const populatedOrder = await Order.findById(order._id)
+      .populate("user", "firstName lastName email")
+      .populate("items.productId", "productName");
+
     const formattedItems = populatedOrder.items.map(item => {
-      let productName = item.productId && item.productId.productName ? item.productId.productName : item.name;
+      const productName = item.productId?.productName || item.name;
+
       return {
         ...item.toObject(),
         productName
       };
     });
+
     const orderObj = populatedOrder.toObject();
+
     const responseOrder = {
       ...orderObj,
-      user: populatedOrder.user,
       items: formattedItems,
-      shippingAddress: orderObj.shippingAddress || '',
-      billingAddress: orderObj.billingAddress || ''
+      shippingAddress: orderObj.shippingAddress || {},
+      billingAddress: orderObj.billingAddress || {},
+      coupon: orderObj.coupon || null
     };
-    res.status(201).json({ success: true, message: 'Order created', data: responseOrder, clientSecret: paymentIntent.client_secret });
+
+    // ------------------------------------------------
+    // RESPONSE
+    // ------------------------------------------------
+    return res.status(201).json({
+      success: true,
+      message: "Order created successfully",
+      data: responseOrder,
+      clientSecret: paymentIntent.client_secret
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error creating order', error: error.message });
+
+    console.error("Create Order Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error creating order",
+      error: error.message
+    });
   }
 };
 
@@ -82,16 +263,11 @@ const createOrder = async (req, res) => {
 const getOrders = async (req, res) => {
   try {
     let { page = 1, limit = 10, search = '', status } = req.query;
-
     page = parseInt(page);
     limit = parseInt(limit);
     const skip = (page - 1) * limit;
 
     const pipeline = [];
-
-    // =============================
-    // USER / ADMIN FILTER
-    // =============================
     const matchQuery = {};
 
     if (req.user.role !== 'admin') {
@@ -106,9 +282,6 @@ const getOrders = async (req, res) => {
       pipeline.push({ $match: matchQuery });
     }
 
-    // =============================
-    // LOOKUPS
-    // =============================
     pipeline.push(
       {
         $lookup: {
@@ -129,9 +302,6 @@ const getOrders = async (req, res) => {
       }
     );
 
-    // =============================
-    // SEARCH FILTER
-    // =============================
     if (search && search.trim() !== '') {
       const regex = new RegExp(search, 'i');
 
@@ -147,28 +317,16 @@ const getOrders = async (req, res) => {
       });
     }
 
-    // =============================
-    // SORT
-    // =============================
     pipeline.push({ $sort: { createdAt: -1 } });
 
-    // =============================
-    // COUNT PIPELINE (before skip/limit)
-    // =============================
     const countPipeline = [...pipeline, { $count: 'total' }];
     const totalResult = await Order.aggregate(countPipeline);
     const total = totalResult.length > 0 ? totalResult[0].total : 0;
 
-    // =============================
-    // PAGINATION
-    // =============================
     pipeline.push({ $skip: skip }, { $limit: limit });
 
     let orders = await Order.aggregate(pipeline);
 
-    // =============================
-    // FORMAT ITEMS WITH PRODUCT NAME
-    // =============================
     orders = orders.map(order => {
       const formattedItems = order.items.map(item => {
         const product = (order.products || []).find(
@@ -207,107 +365,6 @@ const getOrders = async (req, res) => {
     });
   }
 };
-// const getOrders = async (req, res) => {
-//   try {
-//     // Pagination params
-//     let { page = 1, limit = 10, search = '', status } = req.query;
-//     page = parseInt(page);
-//     limit = parseInt(limit);
-//     const skip = (page - 1) * limit;
-
-//     let query = {};
-//     if (req.user.role !== 'admin') {
-//       query.user = req.user.id;
-//     }
-//     if (status && status !== '') {
-//       query.status = status;
-//     }
-
-//     // If search is provided, build $or query for userName, email, status, or productName (from products array)
-//     let userOrProductMatch = [];
-//     if (search && search.trim() !== '') {
-//       const regex = new RegExp(search, 'i');
-//       userOrProductMatch.push(
-//         { status: regex },
-//         { 'user.userName': regex },
-//         { 'user.email': regex },
-//         { 'products.productName': regex }
-//       );
-//     }
-
-//     // Aggregate pipeline for search and pagination
-//     const pipeline = [];
-//     if (Object.keys(query).length > 0) {
-//       pipeline.push({ $match: query });
-//     }
-//     pipeline.push(
-//       { $lookup: {
-//           from: 'users',
-//           localField: 'user',
-//           foreignField: '_id',
-//           as: 'user'
-//         }
-//       },
-//       { $unwind: '$user' },
-//       { $lookup: {
-//           from: 'products',
-//           localField: 'items.productId',
-//           foreignField: '_id',
-//           as: 'products'
-//         }
-//       }
-//     );
-//     // If searching, match after lookups so productName is available
-//     if (userOrProductMatch.length > 0) {
-//       pipeline.push({ $match: { $or: userOrProductMatch } });
-//     }
-//     pipeline.push(
-//       { $sort: { createdAt: -1 } },
-//       { $skip: skip },
-//       { $limit: limit }
-//     );
-
-//     // Get total count for pagination
-//     const countPipeline = pipeline.slice(0, pipeline.findIndex(p => p.$skip !== undefined || p.$limit !== undefined));
-//     countPipeline.push({ $count: 'total' });
-//     const totalResult = await Order.aggregate(countPipeline);
-//     const total = totalResult.length > 0 ? totalResult[0].total : 0;
-
-//     // Get paginated orders
-//     let orders = await Order.aggregate(pipeline);
-
-//     // Attach productName to items
-//     orders = orders.map(order => {
-//       const formattedItems = order.items.map(item => {
-//         let product = (order.products || []).find(p => p._id.toString() === (item.productId ? item.productId.toString() : ''));
-//         let productName = product ? product.productName : item.name;
-//         return {
-//           ...item,
-//           productName
-//         };
-//       });
-//       return {
-//         ...order,
-//         user: order.user,
-//         items: formattedItems,
-//         shippingAddress: order.shippingAddress || ''
-//       };
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       data: orders,
-//       pagination: {
-//         total,
-//         page,
-//         limit,
-//         totalPages: Math.ceil(total / limit)
-//       }
-//     });
-//   } catch (error) {
-//     res.status(500).json({ success: false, message: 'Error fetching orders', error: error.message });
-//   }
-// };
 
 // Update order status (admin)
 const updateOrderStatus = async (req, res) => {
@@ -370,6 +427,20 @@ const updateOrder = async (req, res) => {
     res.status(200).json({ success: true, message: 'Order updated', data: order });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error updating order', error: error.message });
+  }
+};
+
+// Delete order (admin)
+const deleteOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = await Order.findByIdAndDelete(id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+    res.status(200).json({ success: true, message: 'Order deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error deleting order', error: error.message });
   }
 };
 

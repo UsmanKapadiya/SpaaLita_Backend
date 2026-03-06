@@ -5,7 +5,12 @@ const orderSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
+    },
+    guestInfo: {
+      name: String,
+      email: String,
+      phone: String,
     },
     items: [
       {
@@ -59,6 +64,11 @@ const orderSchema = new mongoose.Schema(
       country: { type: String, default: '' },
       email: { type: String, default: '' },
       phone: { type: String, default: '' },
+    },
+    coupon: {
+      code: { type: String },
+      discountAmount: { type: Number, default: 0 },
+      freeShippingAmount: { type: Number, default: 0 },
     },
   },
   {
