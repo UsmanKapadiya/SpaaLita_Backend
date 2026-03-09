@@ -1,24 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const authenticateToken = require('../middleware/authenticateToken');
 const upload = require('../middleware/upload');
+const authenticateToken = require('../middleware/authenticateToken');
+
 const {
   uploadImages,
   getGalleryImages,
   deleteGalleryImage,
+  updateGallery
 } = require('../controllers/galleryController');
 
-// Apply token authentication to all gallery routes
-router.use(authenticateToken);
-
-// Upload single or multiple images (use 'image' for single, 'images' for multiple)
-router.post('/upload', upload.fields([
-  { name: 'image', maxCount: 1 },
-  { name: 'images', maxCount: 10 }
-]), uploadImages);
-// Get all gallery images
+// CRUD Routes
 router.get('/', getGalleryImages);
-// Delete gallery image by gallery document id
+router.post('/create', authenticateToken, upload.array('images', 10), uploadImages);
+router.put('/:id', authenticateToken,  upload.single('image'), updateGallery);
 router.delete('/:id', deleteGalleryImage);
 
 module.exports = router;
