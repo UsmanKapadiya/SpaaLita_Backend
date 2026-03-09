@@ -13,7 +13,7 @@ const {
 // CRUD Routes
 router.get('/', getGalleryImages);
 router.post('/create', authenticateToken, upload.array('images', 10), uploadImages);
-router.put('/:id', authenticateToken,  upload.single('image'), updateGallery);
+router.put('/:id', authenticateToken, upload.single('image'), updateGallery);
 router.delete('/:id', deleteGalleryImage);
 
 module.exports = router;

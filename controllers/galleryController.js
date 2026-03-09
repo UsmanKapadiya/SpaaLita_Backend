@@ -59,17 +59,31 @@ exports.deleteGalleryImage = async (req, res) => {
   }
 };
 
-// Update an existing gallery image by ID
 exports.updateGallery = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!req.files || req.files.length === 0) return res.status(400).json({ message: 'No images provided for update.' });
 
-    const newUrl = bufferToBase64(req.files[0]);
-    const updated = await Gallery.findByIdAndUpdate(id, { url: newUrl }, { new: true });
-    if (!updated) return res.status(404).json({ message: 'Image not found' });
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image provided for update.' });
+    }
 
-    res.status(200).json({ message: 'Image updated successfully', data: updated });
+    const newUrl = `/uploads/${req.file.filename}`;
+
+    const updated = await Gallery.findByIdAndUpdate(
+      id,
+      { url: newUrl },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Image not found' });
+    }
+
+    res.status(200).json({
+      message: 'Image updated successfully',
+      data: updated
+    });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error updating image' });
