@@ -16,7 +16,11 @@ exports.uploadImages = async (req, res) => {
 
     const savedImages = await Gallery.insertMany(galleryDocs);
 
-    res.status(201).json({ message: 'Images uploaded successfully', data: savedImages });
+    res.status(201).json({
+      success: true,
+      message: 'Images uploaded successfully',
+      data: savedImages
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Failed to upload images' });
@@ -39,7 +43,10 @@ exports.getGalleryImages = async (req, res) => {
     }
 
     const images = await Gallery.find(filter).sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: images });
+    res.status(200).json({
+      success: true,
+      data: images
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error fetching gallery' });
@@ -52,7 +59,10 @@ exports.deleteGalleryImage = async (req, res) => {
     const { id } = req.params;
     const deleted = await Gallery.findByIdAndDelete(id);
     if (!deleted) return res.status(404).json({ message: 'Image not found' });
-    res.status(200).json({ message: 'Image deleted successfully' });
+    res.status(200).json({
+      success: true,
+      message: 'Image deleted successfully'
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error deleting image' });
@@ -80,6 +90,7 @@ exports.updateGallery = async (req, res) => {
     }
 
     res.status(200).json({
+      success: true,
       message: 'Image updated successfully',
       data: updated
     });
