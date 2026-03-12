@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../middleware/upload');
+const createUpload = require('../middleware/upload');
+const uploadProduct = createUpload('products');
 const authenticateToken = require('../middleware/authenticateToken');
 const {
   addProduct,
@@ -13,10 +14,11 @@ const {
 } = require('../controllers/productController');
 
 //add Products
-router.post('/', authenticateToken, upload.array('productImages', 10), addProduct);
+// router.post('/', authenticateToken, upload.array('productImages', 10), addProduct);
+router.post('/', authenticateToken, uploadProduct.array('productImages', 10), addProduct);
 
 //Update Products
-router.put('/:id', authenticateToken, upload.array('productImages', 10), updateProduct);
+router.put('/:id', authenticateToken, uploadProduct.array('productImages', 10), updateProduct);
 
 //Delete 
 router.delete('/:id', authenticateToken, deleteProduct);

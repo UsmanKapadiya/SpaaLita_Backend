@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../middleware/upload');
+const createUpload = require('../middleware/upload');
+const uploadGiftCard = createUpload('products');
 const authenticateToken = require('../middleware/authenticateToken');
 const {
   addGiftCard,
@@ -12,9 +13,12 @@ const {
 } = require('../controllers/giftCardController');
 
 
-router.post('/', authenticateToken, upload.array('productImages', 10), addGiftCard);
+// router.post('/', authenticateToken, upload.array('productImages', 10), addGiftCard);
+router.post('/', authenticateToken, uploadGiftCard.array('productImages', 10), addGiftCard);
 
-router.put('/:id', authenticateToken,  upload.array('productImages', 10), updateGiftCard);
+
+// router.put('/:id', authenticateToken,  upload.array('productImages', 10), updateGiftCard);
+router.put('/:id', authenticateToken,  uploadGiftCard.array('productImages', 10), updateGiftCard);
 
 router.delete('/:id', authenticateToken, deleteGiftCard);
 
