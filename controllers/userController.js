@@ -4,7 +4,6 @@ const User = require('../models/User');
 const addUser = async (req, res) => {
   try {
     const {
-      profilePicture,
       userName,
       firstName,
       lastName,
@@ -39,9 +38,13 @@ const addUser = async (req, res) => {
       return res.status(409).json({ success: false, message: 'User name or email already exists' });
     }
 
-    // Hash password before saving
+    // Hash password
     const bcrypt = require('bcryptjs');
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Use uploaded file
+    const profilePicture = req.file ? `/uploads/userProfile/${req.file.filename}` : null;
+
     const user = new User({
       profilePicture,
       userName,
@@ -57,41 +60,101 @@ const addUser = async (req, res) => {
       role,
       status
     });
+
     await user.save();
-    res.status(201).json({ success: true, message: 'User created successfully', data: user });
+
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      data: user
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error creating user', error: error.message });
   }
 };
-
 // Update user
 const updateUser = async (req, res) => {
   try {
-    const { id } = req.params;
-    const updates = req.body;
-    // Prevent updating email or userName to an existing one
-    if (updates.userName || updates.email) {
-      const existingUser = await User.findOne({
-        $or: [
-          updates.userName ? { userName: updates.userName } : {},
-          updates.email ? { email: updates.email } : {}
-        ],
-        _id: { $ne: id }
-      });
-      if (existingUser) {
-        return res.status(409).json({ success: false, message: 'User name or email already exists' });
-      }
+    const { userName, firstName, lastName, email, phone, country, city, address, postalCode, role, status } = req.body;
+    const userId = req.params.id;
+
+    const updates = { userName, firstName, lastName, email, phone, country, city, address, postalCode, role, status };
+
+    // If profile picture uploaded, update it
+    if (req.file && req.file.filename) {
+      updates.profilePicture = `userProfile/${req.file.filename}`; // Save path for frontend
     }
-    const user = await User.findByIdAndUpdate(id, updates, { new: true });
+
+    const user = await User.findByIdAndUpdate(userId, updates, { new: true });
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+
     res.status(200).json({ success: true, message: 'User updated successfully', data: user });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error updating user', error: error.message });
   }
 };
+// const updateUser = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const updates = req.body;
+//     // Prevent updating email or userName to an existing one
+//     if (updates.userName || updates.email) {
+//       const existingUser = await User.findOne({
+//         $or: [
+//           updates.userName ? { userName: updates.userName } : {},
+//           updates.email ? { email: updates.email } : {}
+//         ],
+//         _id: { $ne: id }
+//       });
+//       if (existingUser) {
+//         return res.status(409).json({ success: false, message: 'User name or email already exists' });
+//       }
+//     }
+//     const user = await User.findByIdAndUpdate(id, updates, { new: true });
+//     if (!user) {
+//       return res.status(404).json({ success: false, message: 'User not found' });
+//     }
+//     res.status(200).json({ success: true, message: 'User updated successfully', data: user });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: 'Error updating user', error: error.message });
+//   }
+// };
 
+// Update user billing and shipping addresses
+const updateUserAddresses = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { billing, shipping } = req.body;
+
+    if (!billing && !shipping) {
+      return res.status(400).json({ success: false, message: "No address data provided" });
+    }
+
+    // Build update object
+    const updates = {};
+    if (billing) updates.billing = billing;
+    if (shipping) updates.shipping = shipping;
+
+    const user = await User.findByIdAndUpdate(id, updates, { new: true });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "User addresses updated successfully",
+      data: user,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error updating addresses",
+      error: error.message,
+    });
+  }
+};
 // Delete user
 const deleteUser = async (req, res) => {
   try {
@@ -189,7 +252,32 @@ const loginUser = async (req, res) => {
     }
     // Generate JWT
     const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
-    res.status(200).json({ success: true, message: 'Login successful', token, user: { id: user._id, email: user.email, userName: user.userName, role: user.role } });
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        token,
+               user: {
+          id: user._id,
+          userName: user.userName,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          phone: user.phone,
+          country: user.country,
+          city: user.city,
+          address: user.address,
+          postalCode: user.postalCode,
+          profilePicture: user.profilePicture,
+          role: user.role,
+          status: user.status,
+          billing: user.billing,
+          shipping: user.shipping,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error logging in', error: error.message });
   }
@@ -205,6 +293,7 @@ const logoutUser = async (req, res) => {
 module.exports = {
   addUser,
   updateUser,
+  updateUserAddresses,
   deleteUser,
   getUsers,
   getUser,

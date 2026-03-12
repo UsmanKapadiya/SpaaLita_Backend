@@ -1,10 +1,13 @@
 const express = require('express');
 const router = express.Router();
-
+const createUpload = require('../middleware/upload');
 const authenticateToken = require('../middleware/authenticateToken');
+const uploadUserProfile = createUpload('userProfile');
+
 const {
   addUser,
   updateUser,
+  updateUserAddresses,
   deleteUser,
   getUsers,
   getUser,
@@ -21,9 +24,13 @@ router.post('/logout', logoutUser);
 router.use(authenticateToken);
 
 // Add user
-router.post('/', addUser);
+// router.post('/', addUser);
+
+router.post('/', uploadUserProfile.single('profilePicture'), addUser);
+
 // Update user
-router.put('/:id', updateUser);
+router.put('/:id', uploadUserProfile.single('profilePicture'), updateUser);
+router.put('/:id/addresses', updateUserAddresses);
 // Delete user
 router.delete('/:id', deleteUser);
 // Get all users
