@@ -3,40 +3,85 @@ const GiftCard = require('../models/GiftCard');
 // Add new gift card
 const addGiftCard = async (req, res) => {
   try {
-    const { productName, sku, price, qty, productImages, description, category } = req.body;
+    const { productName, sku, price, qty, description, category } = req.body;
+
     if (!productName || !sku || !price || !qty || !description || !category) {
       return res.status(400).json({ success: false, message: 'All fields are required' });
     }
+
     const existingGiftCard = await GiftCard.findOne({ sku });
+
     if (existingGiftCard) {
       return res.status(409).json({ success: false, message: 'SKU already exists' });
     }
-    const giftCard = new GiftCard({ productName, sku, price, qty, productImages, description, category });
+
+    // get uploaded images
+    const productImages = req.files.map(file => file.filename);
+
+    const giftCard = new GiftCard({
+      productName,
+      sku,
+      price,
+      qty,
+      productImages,
+      description,
+      category
+    });
+
     await giftCard.save();
-    res.status(201).json({ success: true, message: 'Gift card created successfully', data: giftCard });
+
+    res.status(201).json({
+      success: true,
+      message: 'Gift card created successfully',
+      data: giftCard
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error creating gift card', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error creating gift card',
+      error: error.message
+    });
   }
 };
 
 // Update gift card
 const updateGiftCard = async (req, res) => {
   try {
-    const { id } = req.params;
-    const updates = req.body;
-    if (updates.sku) {
-      const existingGiftCard = await GiftCard.findOne({ sku: updates.sku, _id: { $ne: id } });
-      if (existingGiftCard) {
-        return res.status(409).json({ success: false, message: 'SKU already exists' });
-      }
+    const { existingImages } = req.body;
+    const newImages = req.files ? req.files.map(f => f.filename) : [];
+
+    const productImages = [...(existingImages || []), ...newImages];
+
+    // Update GiftCard
+    const updatedProduct = await GiftCard.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body, productImages },
+      { new: true }
+    );
+
+    if (!updatedProduct) {
+      return res.status(404).json({
+        success: false,
+        message: "Gift card not found",
+        data: null
+      });
     }
-    const giftCard = await GiftCard.findByIdAndUpdate(id, updates, { new: true });
-    if (!giftCard) {
-      return res.status(404).json({ success: false, message: 'Gift card not found' });
-    }
-    res.status(200).json({ success: true, message: 'Gift card updated successfully', data: giftCard });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error updating gift card', error: error.message });
+
+    // Return success in same format as create API
+    res.status(200).json({
+      success: true,
+      message: "Gift card updated successfully",
+      data: updatedProduct
+    });
+
+  }
+  catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating Gift Card",
+      error: error.message
+    });
   }
 };
 
@@ -57,33 +102,34 @@ const deleteGiftCard = async (req, res) => {
 // Get all gift cards (active only)
 const getGiftCards = async (req, res) => {
   try {
-      const { page = 1, limit = 10, search = '' } = req.query;
-      const query = {
-        status: { $ne: 'inactive' }
-      };
-      if (search) {
-        query.$or = [
-          { productName: { $regex: search, $options: 'i' } },
-          { sku: { $regex: search, $options: 'i' } },
-          { category: { $regex: search, $options: 'i' } }
-        ];
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const query = {
+      status: { $ne: 'inactive' }
+    };
+    if (search) {
+      query.$or = [
+        { productName: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } }
+      ];
+    }
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const products = await GiftCard.find(query)
+      .sort({ createdAt: -1 }) 
+      .skip(skip)
+      .limit(parseInt(limit));
+    const total = await GiftCard.countDocuments(query);
+    res.status(200).json({
+      success: true,
+      data: products,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
       }
-      const skip = (parseInt(page) - 1) * parseInt(limit);
-      const products = await GiftCard.find(query)
-        .skip(skip)
-        .limit(parseInt(limit));
-      const total = await GiftCard.countDocuments(query);
-      res.status(200).json({
-        success: true,
-        data: products,
-        pagination: {
-          total,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          pages: Math.ceil(total / parseInt(limit))
-        }
-      });
-    } catch (error) {
+    });
+  } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching gift cards', error: error.message });
   }
 };
@@ -114,7 +160,7 @@ const getRelatedGiftCards = async (req, res) => {
       _id: { $ne: id },
       category: giftCard.category,
       status: { $ne: 'inactive' }
-    }).limit(10);
+    }).limit(4);
     res.status(200).json({ success: true, data: related });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching related gift cards', error: error.message });
