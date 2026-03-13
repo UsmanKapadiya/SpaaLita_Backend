@@ -16,7 +16,15 @@ const userSchema = new mongoose.Schema(
     role: { type: String, default: 'user' },
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
 
-    // ✅ Add these fields
+    resetPasswordToken: {
+      type: String,
+      default: null,
+    },
+    resetPasswordExpire: {
+      type: Date,
+      default: null,
+    },
+    
     billing: {
       firstName: String,
       lastName: String,

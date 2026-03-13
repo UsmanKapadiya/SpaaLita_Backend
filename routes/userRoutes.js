@@ -13,28 +13,34 @@ const {
   getUser,
   loginUser,
   logoutUser,
+  forgotPassword,
+  resetPassword
 } = require('../controllers/userController');
 
 
 // Public routes
 router.post('/login', loginUser);
 router.post('/logout', logoutUser);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password/:token', resetPassword);
 
 // Apply token authentication to all user routes below
 router.use(authenticateToken);
 
 // Add user
-// router.post('/', addUser);
-
 router.post('/', uploadUserProfile.single('profilePicture'), addUser);
 
 // Update user
 router.put('/:id', uploadUserProfile.single('profilePicture'), updateUser);
+
 router.put('/:id/addresses', updateUserAddresses);
+
 // Delete user
 router.delete('/:id', deleteUser);
+
 // Get all users
 router.get('/', getUsers);
+
 // Get single user
 router.get('/:id', getUser);
 

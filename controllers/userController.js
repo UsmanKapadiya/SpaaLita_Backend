@@ -1,4 +1,8 @@
 const User = require('../models/User');
+const crypto = require("crypto");
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 // Add new user
 const addUser = async (req, res) => {
@@ -72,6 +76,7 @@ const addUser = async (req, res) => {
     res.status(500).json({ success: false, message: 'Error creating user', error: error.message });
   }
 };
+
 // Update user
 const updateUser = async (req, res) => {
   try {
@@ -95,6 +100,7 @@ const updateUser = async (req, res) => {
     res.status(500).json({ success: false, message: 'Error updating user', error: error.message });
   }
 };
+
 // const updateUser = async (req, res) => {
 //   try {
 //     const { id } = req.params;
@@ -155,6 +161,7 @@ const updateUserAddresses = async (req, res) => {
     });
   }
 };
+
 // Delete user
 const deleteUser = async (req, res) => {
   try {
@@ -230,10 +237,6 @@ const getUser = async (req, res) => {
 };
 
 
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
-
 // User Login
 const loginUser = async (req, res) => {
   try {
@@ -290,6 +293,102 @@ const logoutUser = async (req, res) => {
   res.status(200).json({ success: true, message: 'Logout successful' });
 };
 
+const forgotPassword = async (req, res) => {
+  try {
+    const { email, userName } = req.body;
+
+    if (!email && !userName) {
+      return res.status(400).json({
+        success: false,
+        message: "Email or userName is required",
+      });
+    }
+
+    const user = await User.findOne({
+      $or: [{ email }, { userName }],
+      status: "active",
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 min
+
+    await user.save();
+
+    const resetLink = `http://localhost:3000/reset-password/${resetToken}`;
+
+    res.status(200).json({
+      success: true,
+      message: "Reset password link generated",
+      resetLink,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error in forgot password",
+      error: error.message,
+    });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Token invalid or expired",
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+
+    user.resetPasswordToken = null;
+    user.resetPasswordExpire = null;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successful",
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error resetting password",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   addUser,
   updateUser,
@@ -299,4 +398,6 @@ module.exports = {
   getUser,
   loginUser,
   logoutUser,
+  forgotPassword,
+  resetPassword
 };
