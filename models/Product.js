@@ -1,48 +1,40 @@
 const mongoose = require('mongoose');
 
+
 const productSchema = new mongoose.Schema(
   {
-    productName: {
-      type: String,
-      required: [true, 'Please provide a product name'],
-      trim: true,
-    },
-    sku: {
-      type: String,
-      required: [true, 'Please provide a SKU'],
-      unique: true,
-      trim: true,
-    },
-    price: {
-      type: Number,
-      required: [true, 'Please provide a price'],
-    },
-    qty: {
-      type: Number,
-      required: [true, 'Please provide quantity'],
-    },
-    productImages: [
+    productName: { type: String, required: true, trim: true },
+    sku: { type: String, required: true, unique: true, trim: true },
+    price: { type: Number, required: true },
+    regular_price: { type: String, default: '' },
+    sale_price: { type: String, default: '' },
+    qty: { type: Number, required: true },
+    productImages: [{ type: String }],
+    description: { type: String, required: true },
+    short_description: { type: String, default: '' },
+    // category: { type: String, required: true }, // main category string
+    // categories: [ // for multiple categories
+    //   {
+    //     id: { type: Number },
+    //     name: { type: String },
+    //     slug: { type: String },
+    //   }
+    // ],
+    categories: [
       {
-        type: String, // URL or file path
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Category"
       }
     ],
-    description: {
-      type: String,
-      required: [true, 'Please provide a description'],
-    },
-    category: {
-      type: String,
-      required: [true, 'Please provide a category'],
-    },
-    status: {
-      type: String,
-      enum: ['active', 'inactive'],
-      default: 'active',
-    },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+    slug: { type: String, default: '' },
+    tax_status: { type: String, enum: ['taxable', 'none'], default: 'none' },
+    shipping_required: { type: Boolean, default: true },
+    shipping_taxable: { type: Boolean, default: false },
+    stock_status: { type: String, enum: ['instock', 'outofstock'], default: 'instock' },
+    related_ids: [{ type: Number }],
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 module.exports = mongoose.model('Product', productSchema);

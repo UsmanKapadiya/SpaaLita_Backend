@@ -3,29 +3,77 @@ const Product = require('../models/Product');
 // Add new product
 const addProduct = async (req, res) => {
   try {
-    const { productName, sku, price, qty, description, category } = req.body;
+    let {
+      productName,
+      sku,
+      price,
+      qty,
+      description,
+      slug,
+      regular_price,
+      sale_price,
+      short_description,
+      tax_status,
+      shipping_required,
+      shipping_taxable,
+      stock_status,
+      categories,
+      related_ids
+    } = req.body;
 
-    if (!productName || !sku || !price || !qty || !description || !category) {
-      return res.status(400).json({ success: false, message: "All fields are required" });
+    // ✅ Fix categories parsing (handles all cases)
+    categories = categories || req.body["categories[]"] || [];
+
+    if (typeof categories === "string") {
+      try {
+        categories = JSON.parse(categories);
+      } catch {
+        categories = [categories];
+      }
     }
 
+    if (!Array.isArray(categories)) {
+      categories = [categories];
+    }
+
+    // ✅ Required fields check (FIXED)
+    if (!productName || !sku || !price || !qty || !description || categories.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "All required fields must be provided"
+      });
+    }
+
+    // ✅ SKU check
     const existingProduct = await Product.findOne({ sku });
-
     if (existingProduct) {
-      return res.status(409).json({ success: false, message: "SKU already exists" });
+      return res.status(409).json({
+        success: false,
+        message: "SKU already exists"
+      });
     }
 
-    // get uploaded images
-    const productImages = req.files.map(file => file.filename);
+    // ✅ Images
+    const productImages = req.files ? req.files.map(f => f.filename) : [];
 
+    // ✅ Create product
     const product = new Product({
       productName,
       sku,
       price,
       qty,
       description,
-      category,
-      productImages
+      productImages,
+      slug: slug || '',
+      regular_price: regular_price || '',
+      sale_price: sale_price || '',
+      short_description: short_description || '',
+      tax_status: tax_status || 'none',
+      shipping_required: shipping_required !== undefined ? shipping_required : true,
+      shipping_taxable: shipping_taxable !== undefined ? shipping_taxable : false,
+      stock_status: stock_status || 'instock',
+      categories,
+      related_ids: related_ids || []
     });
 
     await product.save();
@@ -37,6 +85,8 @@ const addProduct = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("ERROR:", error);
+
     res.status(500).json({
       success: false,
       message: "Error creating product",
@@ -44,18 +94,128 @@ const addProduct = async (req, res) => {
     });
   }
 };
+// const addProduct = async (req, res) => {
+//   try {
+//     const { productName, sku, price, qty, description, category } = req.body;
+
+//     if (!productName || !sku || !price || !qty || !description || !category) {
+//       return res.status(400).json({ success: false, message: "All fields are required" });
+//     }
+
+//     const existingProduct = await Product.findOne({ sku });
+
+//     if (existingProduct) {
+//       return res.status(409).json({ success: false, message: "SKU already exists" });
+//     }
+
+//     // get uploaded images
+//     const productImages = req.files.map(file => file.filename);
+
+//     const product = new Product({
+//       productName,
+//       sku,
+//       price,
+//       qty,
+//       description,
+//       category,
+//       productImages
+//     });
+
+//     await product.save();
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Product created successfully",
+//       data: product
+//     });
+
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: "Error creating product",
+//       error: error.message
+//     });
+//   }
+// };
 
 const updateProduct = async (req, res) => {
   try {
-    const { existingImages } = req.body;
+    let {
+      productName,
+      sku,
+      price,
+      qty,
+      description,
+      slug,
+      regular_price,
+      sale_price,
+      short_description,
+      tax_status,
+      shipping_required,
+      shipping_taxable,
+      stock_status,
+      categories,
+      related_ids,
+      existingImages
+    } = req.body;
+
+    // ✅ Parse categories (IMPORTANT)
+    categories = categories || req.body["categories[]"] || [];
+
+    if (typeof categories === "string") {
+      try {
+        categories = JSON.parse(categories);
+      } catch {
+        categories = [categories];
+      }
+    }
+
+    if (!Array.isArray(categories)) {
+      categories = [categories];
+    }
+
+    // ✅ Parse existingImages (IMPORTANT)
+    if (typeof existingImages === "string") {
+      try {
+        existingImages = JSON.parse(existingImages);
+      } catch {
+        existingImages = [existingImages];
+      }
+    }
+
+    if (!Array.isArray(existingImages)) {
+      existingImages = existingImages ? [existingImages] : [];
+    }
+
+    // ✅ New uploaded images
     const newImages = req.files ? req.files.map(f => f.filename) : [];
 
-    const productImages = [...(existingImages || []), ...newImages];
+    // ✅ Merge images
+    const productImages = [...existingImages, ...newImages];
 
-    // Update product
+    // ✅ Update object (clean & controlled)
+    const updateData = {
+      productName,
+      sku,
+      price,
+      qty,
+      description,
+      slug: slug || '',
+      regular_price: regular_price || '',
+      sale_price: sale_price || '',
+      short_description: short_description || '',
+      tax_status: tax_status || 'none',
+      shipping_required: shipping_required !== undefined ? shipping_required : true,
+      shipping_taxable: shipping_taxable !== undefined ? shipping_taxable : false,
+      stock_status: stock_status || 'instock',
+      categories,
+      related_ids: related_ids || [],
+      productImages
+    };
+
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
-      { ...req.body, productImages },
+      updateData,
       { new: true }
     );
 
@@ -67,14 +227,14 @@ const updateProduct = async (req, res) => {
       });
     }
 
-    // Return success in same format as create API
     res.status(200).json({
       success: true,
       message: "Product updated successfully",
       data: updatedProduct
     });
+
   } catch (error) {
-    console.error(error);
+    console.error("UPDATE ERROR:", error);
     res.status(500).json({
       success: false,
       message: "Error updating product",
@@ -82,6 +242,43 @@ const updateProduct = async (req, res) => {
     });
   }
 };
+// const updateProduct = async (req, res) => {
+//   try {
+//     const { existingImages } = req.body;
+//     const newImages = req.files ? req.files.map(f => f.filename) : [];
+
+//     const productImages = [...(existingImages || []), ...newImages];
+
+//     // Update product
+//     const updatedProduct = await Product.findByIdAndUpdate(
+//       req.params.id,
+//       { ...req.body, productImages },
+//       { new: true }
+//     );
+
+//     if (!updatedProduct) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Product not found",
+//         data: null
+//       });
+//     }
+
+//     // Return success in same format as create API
+//     res.status(200).json({
+//       success: true,
+//       message: "Product updated successfully",
+//       data: updatedProduct
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Error updating product",
+//       error: error.message
+//     });
+//   }
+// };
 
 // Delete product (soft delete)
 const deleteProduct = async (req, res) => {
