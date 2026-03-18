@@ -12,14 +12,6 @@ const productSchema = new mongoose.Schema(
     productImages: [{ type: String }],
     description: { type: String, required: true },
     short_description: { type: String, default: '' },
-    // category: { type: String, required: true }, // main category string
-    // categories: [ // for multiple categories
-    //   {
-    //     id: { type: Number },
-    //     name: { type: String },
-    //     slug: { type: String },
-    //   }
-    // ],
     categories: [
       {
         type: mongoose.Schema.Types.ObjectId,
