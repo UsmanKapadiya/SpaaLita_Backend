@@ -210,42 +210,89 @@ const getProducts = async (req, res) => {
     const { page = 1, limit = 10, search = '', sort = '' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Fetch all categories and flatten them
+    // Fetch and flatten all categories (to map later)
     const allCategories = await Category.find().lean();
-    const flatCategories = flattenCategoriesTree(allCategories); // same flatten helper as in details API
+    const flatCategories = flattenCategoriesTree(allCategories);
 
-    // 2 Build base query
-    const query = {
-      status: { $ne: 'inactive' },
-      productImages: { $exists: true, $ne: [] }
-    };
+    // Build aggregation pipeline
+    const pipeline = [
+      { $match: { status: { $ne: 'inactive' }, productImages: { $exists: true, $ne: [] } } },
 
-    // 3 Fetch products
-    let products = await Product.find(query)
-      .sort(getSortOption(sort))
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean(); // use lean to simplify mapping
+      // Lookup categories
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'categories',
+          foreignField: '_id',
+          as: 'categories'
+        }
+      },
+    ];
 
-    // 4 Map product categories using flattened categories
+    // Apply search if provided
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      pipeline.push({
+        $match: {
+          $or: [
+            { productName: regex },
+            { sku: regex },
+            { 'categories.name': regex }
+          ]
+        }
+      });
+    }
+
+    // Count total after search
+    const totalResult = await Product.aggregate([...pipeline, { $count: 'total' }]);
+    const total = totalResult[0]?.total || 0;
+
+    // Apply sorting
+    pipeline.push({ $sort: getSortOption(sort) });
+
+    // Pagination
+    pipeline.push({ $skip: skip }, { $limit: parseInt(limit) });
+
+    // Project fields
+    pipeline.push({
+      $project: {
+        productName: 1,
+        sku: 1,
+        price: 1,
+        regular_price: 1,
+        sale_price: 1,
+        qty: 1,
+        productImages: 1,
+        description: 1,
+        short_description: 1,
+        status: 1,
+        categories: { _id: 1, name: 1, slug: 1 },
+        slug: 1,
+        stock_status: 1,
+        createdAt: 1,
+        updatedAt: 1
+      }
+    });
+
+    // Execute aggregation
+    let products = await Product.aggregate(pipeline);
+
+    // Map all categories using flattened tree to ensure **all parent & child categories appear**
     products = products.map(product => {
       const productCategories = [];
       if (Array.isArray(product.categories)) {
-        product.categories.forEach(catId => {
-          const found = flatCategories.find(c => c._id === String(catId));
-          if (found) productCategories.push(found);
+        product.categories.forEach(cat => {
+          // Find in flatCategories using _id
+          const found = flatCategories.find(c => c._id === String(cat._id));
+          if (found && !productCategories.find(pc => pc._id === found._id)) {
+            productCategories.push(found);
+          }
         });
       }
-      return {
-        ...product,
-        categories: productCategories
-      };
+      return { ...product, categories: productCategories };
     });
 
-    // 5 Count total
-    const total = await Product.countDocuments(query);
-
-    // 6 Return response
+    // Return response
     res.status(200).json({
       success: true,
       data: products,
@@ -265,9 +312,10 @@ const getProducts = async (req, res) => {
       error: error.message
     });
   }
-};
+}
 
 // Helper: flatten category tree
+
 function flattenCategoriesTree(categories) {
   const result = [];
   categories.forEach(cat => {
