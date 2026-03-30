@@ -3,9 +3,6 @@ node_modules/
 package-lock.json
 
 # Environment variables
-.env
-.env.local
-.env.production
 
 # Logs
 logs
@@ -17,7 +14,6 @@ npm-debug.log*
 Thumbs.db
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -25,3 +21,4 @@ Thumbs.db
 # Build
 dist/
 build/
+config.bat
