@@ -57,6 +57,7 @@ const contactRoutes = require('./routes/contactRoutes');
 const galleryRoutes = require('./routes/galleryRoutes');
 const couponRoutes = require('./routes/couponRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const dashBoardRoutes = require('./routes/dashBordRoutes');
 
 
 // Use routes
@@ -74,6 +75,7 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/gallery', galleryRoutes);
 app.use('/api/coupon', couponRoutes);
 app.use('/api/category', categoryRoutes);
+app.use('/api/dashboard', dashBoardRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
