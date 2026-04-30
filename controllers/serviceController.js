@@ -1,32 +1,125 @@
 const Service = require('../models/Service');
+const { normalizeProductImage } = require("../utils/normalizeImage");
+
 
 // Add new service
+// const addService = async (req, res) => {
+//   try {
+//     const { serviceName, serviceImage, serviceDescription, buttonUrl } = req.body;
+//     if (!serviceName || !serviceImage || !serviceDescription  || !buttonUrl) {
+//       return res.status(400).json({ success: false, message: 'All fields are required' });
+//     }
+//     const service = new Service({ serviceName, serviceImage, serviceDescription, buttonUrl });
+//     await service.save();
+//     res.status(201).json({ success: true, message: 'Service created successfully', data: service });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: 'Error creating service', error: error.message });
+//   }
+// };
+
 const addService = async (req, res) => {
   try {
-    const { serviceName, serviceImage, serviceDescription, buttonUrl } = req.body;
-    if (!serviceName || !serviceImage || !serviceDescription  || !buttonUrl) {
-      return res.status(400).json({ success: false, message: 'All fields are required' });
+    const { serviceName, serviceDescription, buttonUrl } = req.body;
+
+    const serviceImage = req.file
+      ? `uploads/services/${req.file.filename}`
+      : null;
+
+    if (!serviceName || !serviceImage || !serviceDescription || !buttonUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required"
+      });
     }
-    const service = new Service({ serviceName, serviceImage, serviceDescription, buttonUrl });
+
+    const service = new Service({
+      serviceName,
+      serviceImage,
+      serviceDescription,
+      buttonUrl
+    });
+
     await service.save();
-    res.status(201).json({ success: true, message: 'Service created successfully', data: service });
+
+    res.status(201).json({
+      success: true,
+      message: "Service created successfully",
+      data: service
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error creating service', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Error creating service",
+      error: error.message
+    });
   }
 };
 
 // Update service
+// const updateService = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const updates = req.body;
+//     const service = await Service.findByIdAndUpdate(id, updates, { new: true });
+//     if (!service) {
+//       return res.status(404).json({ success: false, message: 'Service not found' });
+//     }
+//     res.status(200).json({ success: true, message: 'Service updated successfully', data: service });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: 'Error updating service', error: error.message });
+//   }
+// };
+
 const updateService = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
-    const service = await Service.findByIdAndUpdate(id, updates, { new: true });
-    if (!service) {
-      return res.status(404).json({ success: false, message: 'Service not found' });
+
+    const {
+      serviceName,
+      serviceDescription,
+      buttonUrl
+    } = req.body || {};
+
+    const existingService = await Service.findById(id);
+
+    if (!existingService) {
+      return res.status(404).json({
+        success: false,
+        message: "Service not found"
+      });
     }
-    res.status(200).json({ success: true, message: 'Service updated successfully', data: service });
+
+    // if new file uploaded
+    const newImage = req.file
+      ? `services/${req.file.filename}`
+      : existingService.serviceImage;
+
+    const updatedData = {
+      serviceName,
+      serviceDescription,
+      buttonUrl,
+      serviceImage: newImage
+    };
+
+    const service = await Service.findByIdAndUpdate(
+      id,
+      updatedData,
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Service updated successfully",
+      data: service
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error updating service', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Error updating service",
+      error: error.message
+    });
   }
 };
 
@@ -45,46 +138,121 @@ const deleteService = async (req, res) => {
 };
 
 // Get all services (active only)
+// const getServices = async (req, res) => {
+//   try {
+//     const { page = 1, limit = 10, search = '' } = req.query;
+//     const query = {
+//       status: { $ne: 'inactive' },
+//       ...(search && {
+//         serviceName: { $regex: search, $options: 'i' }
+//       })
+//     };
+//     const skip = (parseInt(page) - 1) * parseInt(limit);
+//     const [services, total] = await Promise.all([
+//       Service.find(query).skip(skip).limit(parseInt(limit)),
+//       Service.countDocuments(query)
+//     ]);
+//     res.status(200).json({
+//       success: true,
+//       data: services,
+//       pagination: {
+//         total,
+//         page: parseInt(page),
+//         limit: parseInt(limit),
+//         totalPages: Math.ceil(total / parseInt(limit))
+//       }
+//     });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: 'Error fetching services', error: error.message });
+//   }
+// };
+
 const getServices = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '' } = req.query;
+
     const query = {
       status: { $ne: 'inactive' },
       ...(search && {
         serviceName: { $regex: search, $options: 'i' }
       })
     };
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const skip = (Number(page) - 1) * Number(limit);
+
     const [services, total] = await Promise.all([
-      Service.find(query).skip(skip).limit(parseInt(limit)),
+      Service.find(query).skip(skip).limit(Number(limit)).lean(),
       Service.countDocuments(query)
     ]);
+
+    const formatted = services.map(service => ({
+      ...service,
+      serviceImage: normalizeProductImage(service.serviceImage, 'services')
+    }));
+
     res.status(200).json({
       success: true,
-      data: services,
+      data: formatted,
       pagination: {
         total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / parseInt(limit))
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit)
       }
     });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching services', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching services',
+      error: error.message
+    });
   }
 };
 
 // Get single service
+// const getService = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const service = await Service.findById(id);
+//     if (!service || service.status === 'inactive') {
+//       return res.status(404).json({ success: false, message: 'Service not found' });
+//     }
+//     res.status(200).json({ success: true, data: service });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: 'Error fetching service', error: error.message });
+//   }
+// };
+
 const getService = async (req, res) => {
   try {
     const { id } = req.params;
-    const service = await Service.findById(id);
+
+    const service = await Service.findById(id).lean();
+
     if (!service || service.status === 'inactive') {
-      return res.status(404).json({ success: false, message: 'Service not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
     }
-    res.status(200).json({ success: true, data: service });
+
+    const formattedService = {
+      ...service,
+      serviceImage: normalizeProductImage(service.serviceImage, 'services')
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: formattedService
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching service', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching service',
+      error: error.message
+    });
   }
 };
 
