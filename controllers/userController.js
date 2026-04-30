@@ -207,9 +207,16 @@ const getUsers = async (req, res) => {
       .limit(limit)
       .sort({ createdAt: -1 });
 
+    const updatedUsers = users.map(user => ({
+      ...user._doc,
+      profilePicture: user.profilePicture
+        ? `${req.protocol}://${req.get('host')}/uploads/${user.profilePicture}`
+        : null
+    }));
+
     res.status(200).json({
       success: true,
-      data: users,
+      data: updatedUsers,
       pagination: {
         total,
         page,
@@ -230,7 +237,13 @@ const getUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    res.status(200).json({ success: true, data: user });
+    const updatedUser = {
+      ...user._doc,
+      profilePicture: user.profilePicture
+        ? `${req.protocol}://${req.get('host')}/uploads/${user.profilePicture}`
+        : null
+    };
+    res.status(200).json({ success: true, data: updatedUser });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching user', error: error.message });
   }
@@ -260,7 +273,7 @@ const loginUser = async (req, res) => {
       message: 'Login successful',
       data: {
         token,
-               user: {
+        user: {
           id: user._id,
           userName: user.userName,
           firstName: user.firstName,
