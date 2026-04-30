@@ -2,6 +2,28 @@ const Product = require('../models/Product');
 const Category = require("../models/Category"); 
 
 
+const normalizeProductImage = (img) => {
+  if (!img) return null;
+
+  // If full URL → convert to DB format
+  if (img.startsWith('http')) {
+    const parts = img.split('/uploads/');
+    return parts[1] ? `uploads/${parts[1]}` : null;
+  }
+
+  // already correct
+  if (img.startsWith('uploads/')) return img;
+
+  // fallback (old filename only)
+  return `uploads/products/${img}`;
+};
+
+const formatProductImageUrl = (req, path) => {
+  if (!path) return null;
+  return `${req.protocol}://${req.get('host')}/${path}`;
+};
+
+
 // Add new product
 const addProduct = async (req, res) => {
   try {
@@ -23,7 +45,7 @@ const addProduct = async (req, res) => {
       related_ids
     } = req.body;
 
-    // ✅ Fix categories parsing (handles all cases)
+    // categories fix
     categories = categories || req.body["categories[]"] || [];
 
     if (typeof categories === "string") {
@@ -38,7 +60,6 @@ const addProduct = async (req, res) => {
       categories = [categories];
     }
 
-    // ✅ Required fields check (FIXED)
     if (!productName || !sku || !price || !qty || !description || categories.length === 0) {
       return res.status(400).json({
         success: false,
@@ -46,19 +67,19 @@ const addProduct = async (req, res) => {
       });
     }
 
-    // ✅ SKU check
-    const existingProduct = await Product.findOne({ sku });
-    if (existingProduct) {
+    const exists = await Product.findOne({ sku });
+    if (exists) {
       return res.status(409).json({
         success: false,
         message: "SKU already exists"
       });
     }
 
-    // ✅ Images
-    const productImages = req.files ? req.files.map(f => f.filename) : [];
+    // ✅ STORE CLEAN FORMAT
+    const productImages = req.files
+      ? req.files.map(f => `uploads/products/${f.filename}`)
+      : [];
 
-    // ✅ Create product
     const product = new Product({
       productName,
       sku,
@@ -71,8 +92,8 @@ const addProduct = async (req, res) => {
       sale_price: sale_price || '',
       short_description: short_description || '',
       tax_status: tax_status || 'none',
-      shipping_required: shipping_required !== undefined ? shipping_required : true,
-      shipping_taxable: shipping_taxable !== undefined ? shipping_taxable : false,
+      shipping_required: shipping_required ?? true,
+      shipping_taxable: shipping_taxable ?? false,
       stock_status: stock_status || 'instock',
       categories,
       related_ids: related_ids || []
@@ -87,8 +108,6 @@ const addProduct = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("ERROR:", error);
-
     res.status(500).json({
       success: false,
       message: "Error creating product",
@@ -119,7 +138,7 @@ const updateProduct = async (req, res) => {
       existingImages
     } = req.body;
 
-    // ✅ Parse categories (IMPORTANT)
+    // categories fix
     categories = categories || req.body["categories[]"] || [];
 
     if (typeof categories === "string") {
@@ -134,7 +153,7 @@ const updateProduct = async (req, res) => {
       categories = [categories];
     }
 
-    // ✅ Parse existingImages (IMPORTANT)
+    // existing images fix
     if (typeof existingImages === "string") {
       try {
         existingImages = JSON.parse(existingImages);
@@ -147,54 +166,53 @@ const updateProduct = async (req, res) => {
       existingImages = existingImages ? [existingImages] : [];
     }
 
-    // ✅ New uploaded images
-    const newImages = req.files ? req.files.map(f => f.filename) : [];
+    // new uploads
+    const newImages = req.files
+      ? req.files.map(f => `uploads/products/${f.filename}`)
+      : [];
 
-    // ✅ Merge images
-    const productImages = [...existingImages, ...newImages];
+    // ✅ NORMALIZE EVERYTHING (IMPORTANT FIX)
+    const productImages = [...existingImages, ...newImages]
+      .map(normalizeProductImage)
+      .filter(Boolean);
 
-    // ✅ Update object (clean & controlled)
-    const updateData = {
-      productName,
-      sku,
-      price,
-      qty,
-      description,
-      slug: slug || '',
-      regular_price: regular_price || '',
-      sale_price: sale_price || '',
-      short_description: short_description || '',
-      tax_status: tax_status || 'none',
-      shipping_required: shipping_required !== undefined ? shipping_required : true,
-      shipping_taxable: shipping_taxable !== undefined ? shipping_taxable : false,
-      stock_status: stock_status || 'instock',
-      categories,
-      related_ids: related_ids || [],
-      productImages
-    };
-
-    const updatedProduct = await Product.findByIdAndUpdate(
+    const updated = await Product.findByIdAndUpdate(
       req.params.id,
-      updateData,
+      {
+        productName,
+        sku,
+        price,
+        qty,
+        description,
+        slug: slug || '',
+        regular_price: regular_price || '',
+        sale_price: sale_price || '',
+        short_description: short_description || '',
+        tax_status: tax_status || 'none',
+        shipping_required: shipping_required ?? true,
+        shipping_taxable: shipping_taxable ?? false,
+        stock_status: stock_status || 'instock',
+        categories,
+        related_ids: related_ids || [],
+        productImages
+      },
       { new: true }
     );
 
-    if (!updatedProduct) {
+    if (!updated) {
       return res.status(404).json({
         success: false,
-        message: "Product not found",
-        data: null
+        message: "Product not found"
       });
     }
 
     res.status(200).json({
       success: true,
       message: "Product updated successfully",
-      data: updatedProduct
+      data: updated
     });
 
   } catch (error) {
-    console.error("UPDATE ERROR:", error);
     res.status(500).json({
       success: false,
       message: "Error updating product",
@@ -203,96 +221,54 @@ const updateProduct = async (req, res) => {
   }
 };
 
-
 //Get All Products
 const getProducts = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '', sort = '' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Fetch and flatten all categories (to map later)
     const allCategories = await Category.find().lean();
     const flatCategories = flattenCategoriesTree(allCategories);
 
-    // Build aggregation pipeline
-    const pipeline = [
-      { $match: { status: { $ne: 'inactive' }, productImages: { $exists: true, $ne: [] } } },
+    // base query (NO lookup)
+    let query = { status: { $ne: 'inactive' } };
 
-      // Lookup categories
-      {
-        $lookup: {
-          from: 'categories',
-          localField: 'categories',
-          foreignField: '_id',
-          as: 'categories'
-        }
-      },
-    ];
-
-    // Apply search if provided
     if (search) {
       const regex = new RegExp(search, 'i');
-      pipeline.push({
-        $match: {
-          $or: [
-            { productName: regex },
-            { sku: regex },
-            { 'categories.name': regex }
-          ]
-        }
-      });
+      query.$or = [
+        { productName: regex },
+        { sku: regex }
+      ];
     }
 
-    // Count total after search
-    const totalResult = await Product.aggregate([...pipeline, { $count: 'total' }]);
-    const total = totalResult[0]?.total || 0;
+    const total = await Product.countDocuments(query);
 
-    // Apply sorting
-    pipeline.push({ $sort: getSortOption(sort) });
+    let products = await Product.find(query)
+      .sort(getSortOption(sort))
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
 
-    // Pagination
-    pipeline.push({ $skip: skip }, { $limit: parseInt(limit) });
+    products = products.map(product => ({
+      ...product,
 
-    // Project fields
-    pipeline.push({
-      $project: {
-        productName: 1,
-        sku: 1,
-        price: 1,
-        regular_price: 1,
-        sale_price: 1,
-        qty: 1,
-        productImages: 1,
-        description: 1,
-        short_description: 1,
-        status: 1,
-        categories: { _id: 1, name: 1, slug: 1 },
-        slug: 1,
-        stock_status: 1,
-        createdAt: 1,
-        updatedAt: 1
-      }
-    });
+      // ✅ SAME CATEGORY LOGIC AS getProduct
+      categories: Array.isArray(product.categories)
+        ? product.categories.map(cat => {
+            return flatCategories.find(
+              c => c._id === String(cat)
+            ) || cat;
+          })
+        : [],
 
-    // Execute aggregation
-    let products = await Product.aggregate(pipeline);
+      // image fix
+      productImages: Array.isArray(product.productImages)
+        ? product.productImages.map(img =>
+            `${req.protocol}://${req.get('host')}/${img}`
+          )
+        : []
+    }));
 
-    // Map all categories using flattened tree to ensure **all parent & child categories appear**
-    products = products.map(product => {
-      const productCategories = [];
-      if (Array.isArray(product.categories)) {
-        product.categories.forEach(cat => {
-          // Find in flatCategories using _id
-          const found = flatCategories.find(c => c._id === String(cat._id));
-          if (found && !productCategories.find(pc => pc._id === found._id)) {
-            productCategories.push(found);
-          }
-        });
-      }
-      return { ...product, categories: productCategories };
-    });
-
-    // Return response
     res.status(200).json({
       success: true,
       data: products,
@@ -305,14 +281,13 @@ const getProducts = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error fetching products:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching products",
       error: error.message
     });
   }
-}
+};
 
 // Helper: flatten category tree
 
@@ -344,52 +319,41 @@ function getSortOption(sort) {
 // Products Details 
 const getProduct = async (req, res) => {
   try {
-    const { id } = req.params;
+    const product = await Product.findById(req.params.id).lean();
 
-    // 1 Fetch product
-    const product = await Product.findById(id).lean();
     if (!product) {
-      return res.status(404).json({ success: false, message: "Product not found" });
-    }
-
-    // 2 Fetch all categories and flatten them
-    const allCategories = await Category.find().lean();
-    const flatCategories = flattenCategoriesTree(allCategories);
-
-    // 3 Map product category IDs to actual category objects
-    const productCategories = [];
-    const missingCategories = [];
-
-    if (Array.isArray(product.categories)) {
-      product.categories.forEach(catId => {
-        const found = flatCategories.find(c => c._id === String(catId));
-        if (found) {
-          productCategories.push(found);
-        } else {
-          missingCategories.push(catId);
-        }
+      return res.status(404).json({
+        success: false,
+        message: "Product not found"
       });
     }
 
-    // 4 Log missing categories
-    if (missingCategories.length > 0) {
-      console.warn(`Product "${product.productName}" has missing categories:`, missingCategories);
-    }
+    const allCategories = await Category.find().lean();
+    const flatCategories = flattenCategoriesTree(allCategories);
 
-    // 5 Attach populated categories
-    product.categories = productCategories;
+    const categories = Array.isArray(product.categories)
+      ? product.categories.map(cat => {
+          return flatCategories.find(c => c._id === String(cat)) || cat;
+        })
+      : [];
 
-    //6 Return product details
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      data: product,
+      data: {
+        ...product,
+        categories,
+        productImages: Array.isArray(product.productImages)
+          ? product.productImages.map(img =>
+              `${req.protocol}://${req.get('host')}/${img}`
+            )
+          : []
+      }
     });
 
   } catch (error) {
-    console.error("Error fetching product details:", error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
-      message: "Error fetching product details",
+      message: "Error fetching product",
       error: error.message
     });
   }
