@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const createUpload = require('../middleware/upload');
-const uploadGiftCard = createUpload('products');
+const uploadGiftCard = createUpload('giftcards');
 const authenticateToken = require('../middleware/authenticateToken');
 const {
   addGiftCard,
